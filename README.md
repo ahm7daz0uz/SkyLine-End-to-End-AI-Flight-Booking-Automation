@@ -119,7 +119,7 @@ Below are demonstrations of the different architectural approaches in action, sh
 
 ### 💻 User Interfaces (UI)
 
-| <img src="assets/web_streamlit_chat.png" alt="Approach 3: Streamlit Web UI" width="100%"> | <img src="assets/telegram_n8n_chat.jpg" alt="Approach 4: Telegram Omnichannel" width="100%"> |
+| <img src="assets/web_streamlit_chat.png" alt="Approach 3: Streamlit Web UI" width="100%"> | <img src="assets/telegram_n8n_chat.png" alt="Approach 4: Telegram Omnichannel" width="100%"> |
 | :---: | :---: |
 | **Approach 3: Web Deployment** (Interactive Streamlit App) | **Approach 4: Low-Code Omnichannel** (Telegram Bot via n8n) |
 
