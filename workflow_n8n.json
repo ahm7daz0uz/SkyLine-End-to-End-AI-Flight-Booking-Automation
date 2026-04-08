@@ -1,0 +1,246 @@
+{
+  "name": "Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        32
+      ],
+      "id": "ffbb94b8-0896-498d-b25f-5baf31d78c1f",
+      "name": "Telegram Trigger",
+      "webhookId": "ccc07f65-79a2-4c53-8864-e73f1193029a",
+      "credentials": {
+        "telegramApi": {
+          "id": "y0rP76nz65POvfc4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "أنت مساعد ذكي لحجز رحلات الطيران. المهام المطلوبة منك:\n1. استخدم الأدوات المتاحة للبحث عن الرحلات، حجزها، أو إلغائها بناءً على طلب المستخدم.\n2. تحدث مع المستخدم بلباقة واحترافية باللغة العربية.\n3. [مهم جداً]: ترجم أسماء المدن من العربية إلى الإنجليزية قبل تمريرها لأداة البحث (مثال: 'القاهرة' تصبح 'Cairo')."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        32
+      ],
+      "id": "911543fa-cc89-409d-a743-a82c377f5ce2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        32
+      ],
+      "id": "a0fe5b5f-934f-42f4-a558-8f7f03cbf94f",
+      "name": "Telegram Reply",
+      "webhookId": "756d6392-64d0-471d-96ea-c788cbb1c4a2",
+      "credentials": {
+        "telegramApi": {
+          "id": "y0rP76nz65POvfc4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        128,
+        320
+      ],
+      "id": "b2d153d2-0cec-4170-943a-7849296c8f83",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "7fplqMwGItPaiMZ2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "get_available_flights",
+        "description": "Searches for available flights between two cities. Expects origin and destination in English.",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.flights) {\n  staticData.flights = [\n    { flight_id: 'FL001', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 10:00', price: 500.00, available_seats: 10 },\n    { flight_id: 'FL002', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 14:00', price: 550.00, available_seats: 5 },\n    { flight_id: 'FL003', origin: 'Riyadh', destination: 'Jeddah', departure_time: '2026-04-12 09:00', price: 200.00, available_seats: 20 }\n  ];\n}\n\n// الكلمة السحرية المباشرة (query)\nconst origin = query.origin;\nconst destination = query.destination;\n\nconst available = staticData.flights.filter(f => f.origin === origin && f.destination === destination && f.available_seats > 0);\nif(available.length === 0) return JSON.stringify({status: 'no_flights_found', message: `لا توجد رحلات متاحة من ${origin} إلى ${destination}.`});\nreturn JSON.stringify({status: 'success', flights: available});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"origin\": {\n      \"type\": \"string\",\n      \"description\": \"City of origin in English (e.g., Cairo)\"\n    },\n    \"destination\": {\n      \"type\": \"string\",\n      \"description\": \"Destination city in English (e.g., Dubai)\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        640,
+        320
+      ],
+      "id": "79038b9c-abd8-4c24-afe1-4dcdc3fa23c1",
+      "name": "Search Tool"
+    },
+    {
+      "parameters": {
+        "name": "book_flight",
+        "description": "Books a ticket and updates the database.",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// حقن الداتا بيز مباشرة لتجنب مشاكل وضع التيست\nif (!staticData.flights) {\n  staticData.flights = [\n    { flight_id: 'FL001', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 10:00', price: 500.00, available_seats: 10 },\n    { flight_id: 'FL002', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 14:00', price: 550.00, available_seats: 5 },\n    { flight_id: 'FL003', origin: 'Riyadh', destination: 'Jeddah', departure_time: '2026-04-12 09:00', price: 200.00, available_seats: 20 }\n  ];\n}\n\n// سحب رقم الرحلة وتحويله لحروف كبيرة عشان يتطابق مع الداتا بيز\nconst flight_id = query.flight_id.toUpperCase();\n\n// البحث عن الرحلة\nconst flight = staticData.flights.find(f => f.flight_id === flight_id);\n\nif (!flight) {\n  return JSON.stringify({status: 'error', message: 'رقم الرحلة غير صحيح.'});\n}\n\nif (flight.available_seats <= 0) {\n  return JSON.stringify({status: 'error', message: 'عذراً، هذه الرحلة ممتلئة ولا توجد مقاعد متاحة.'});\n}\n\n// تنفيذ الحجز (تقليل الكراسي)\nflight.available_seats -= 1;\nreturn JSON.stringify({status: 'success', message: `تم حجز الرحلة ${flight_id} بنجاح! تم تأكيد مقعدك.`});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"flight_id\": {\n      \"type\": \"string\",\n      \"description\": \"The ID of the flight to book (e.g., FL001)\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        768,
+        320
+      ],
+      "id": "23af0882-05d0-4322-951d-8a1922e18c01",
+      "name": "Book Tool"
+    },
+    {
+      "parameters": {
+        "name": "cancel_flight",
+        "description": "Cancels a flight ticket using flight_id.",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// حقن الداتا بيز مباشرة لتجنب مشاكل وضع التيست\nif (!staticData.flights) {\n  staticData.flights = [\n    { flight_id: 'FL001', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 10:00', price: 500.00, available_seats: 10 },\n    { flight_id: 'FL002', origin: 'Cairo', destination: 'Dubai', departure_time: '2026-04-10 14:00', price: 550.00, available_seats: 5 },\n    { flight_id: 'FL003', origin: 'Riyadh', destination: 'Jeddah', departure_time: '2026-04-12 09:00', price: 200.00, available_seats: 20 }\n  ];\n}\n\n// سحب رقم الرحلة وتحويله لحروف كبيرة\nconst flight_id = query.flight_id.toUpperCase();\n\n// البحث عن الرحلة\nconst flight = staticData.flights.find(f => f.flight_id === flight_id);\n\nif (!flight) {\n  return JSON.stringify({status: 'error', message: 'رقم الرحلة غير صحيح، لا يمكن الإلغاء.'});\n}\n\n// تنفيذ الإلغاء (زيادة الكراسي)\nflight.available_seats += 1;\nreturn JSON.stringify({status: 'success', message: `تم إلغاء حجز الرحلة ${flight_id} بنجاح وإرجاع المقعد للنظام.`});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"flight_id\": {\n      \"type\": \"string\",\n      \"description\": \"The ID of the flight to cancel (e.g., FL001)\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        880,
+        320
+      ],
+      "id": "6974dd23-28f8-42cd-8637-76ca5e374278",
+      "name": "Cancel Tool"
+    },
+    {
+      "parameters": {},
+      "id": "d7f895c3-dffe-49e4-ab7d-59859a29f8a9",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1,
+      "position": [
+        272,
+        320
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1d9f94f0-5a28-4cbf-a953-66be2d6320f8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cb6802cfcdf557202953d8654968ff942292601ccaa49c2f8a7ee22b37b86af6"
+  },
+  "id": "Kj5YMq4sRQ4NmXNZ",
+  "tags": []
+}
